@@ -1,0 +1,10 @@
+{
+  "title": "Example Co issue monitor",
+  "company": "Example Co",
+  "entity_pattern": "\\bexample ?co\\b",
+  "context_terms": ["payments?", "fintech"],
+  "exclude_terms": ["example cola"],
+  "people": ["Founder Surname"],
+  "monitoring_start": "2026-11-18",
+  "glassdoor_slug": "Example-Co"
+}

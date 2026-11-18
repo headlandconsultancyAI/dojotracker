@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Issue monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@500;600;700&display=swap">
+<style>
+  :root {
+    --navy: #001740; --navy-2: #00244A; --cyan: #00C0E8; --mint: #7FD8C4; --coral: #E8735A;
+    --gd: #2E62B8; --li: #00A9CF;            /* series colours, validated pair */
+    --ink: #0B1B33; --ink-2: #44526A; --muted: #6B7689; --line: #E3E7EE; --grid: #EDF0F4;
+    --bg: #F4F6F9; --card: #FFFFFF; --surface: #FCFCFB;
+    --neg: #B8442C; --neg-bg: #FBE9E4; --mix: #8A5A00; --mix-bg: #FFF3D6; --pos: #1F6B5A; --pos-bg: #E3F5EF; --neu: #44526A; --neu-bg: #EEF1F5;
+    --head: "Azeret Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    --body: Arial, "Helvetica Neue", Helvetica, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.45; }
+  [hidden] { display: none !important; }
+  a { color: var(--gd); }
+  button { font-family: var(--body); }
+
+  /* lock screen */
+  .lock { min-height: 100vh; display: grid; place-items: center; background: var(--navy); padding: 24px; }
+  .lock form { background: #fff; border-radius: 12px; padding: 28px; width: min(380px, 100%); }
+  .lock h1 { font-family: var(--head); font-size: 18px; margin: 0 0 6px; color: var(--navy); }
+  .lock p { margin: 0 0 16px; color: var(--ink-2); }
+  .lock input { width: 100%; font-size: 15px; padding: 10px 12px; border: 1px solid #C9D1DD; border-radius: 8px; }
+  .lock button { margin-top: 12px; width: 100%; padding: 10px; font-size: 15px; border: 0; border-radius: 8px; background: var(--navy); color: #fff; cursor: pointer; }
+  .lock .err { color: var(--neg); margin-top: 10px; min-height: 1.2em; }
+
+  /* header */
+  header.top { background: var(--navy); color: #fff; padding: 20px clamp(16px, 4vw, 40px) 18px; }
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-family: var(--head); font-weight: 600; font-size: clamp(18px, 2.4vw, 24px); margin: 0; letter-spacing: -0.01em; }
+  header .sub { color: #B9C6DA; margin-top: 4px; max-width: 70ch; }
+  .status { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.09); color: #DCE4F0; font-size: 12.5px; }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .pill.warn { background: rgba(232,115,90,0.22); color: #FFD9CF; }
+  .refresh-note { color: #8FA2C0; font-size: 12px; }
+
+  main { padding: 18px clamp(16px, 4vw, 40px) 48px; max-width: 1400px; margin: 0 auto; }
+
+  /* controls */
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 16px; }
+  .seg { display: inline-flex; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 2px; flex-wrap: wrap; }
+  .seg button { border: 0; background: transparent; padding: 6px 10px; border-radius: 6px; cursor: pointer; color: var(--ink-2); font-size: 13px; }
+  .seg button[aria-pressed="true"] { background: var(--navy); color: #fff; }
+  .ctl-label { font-size: 12px; color: var(--muted); margin-right: 6px; text-transform: uppercase; letter-spacing: .04em; }
+
+  /* tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .tile .k { font-size: 12.5px; color: var(--ink-2); }
+  .tile .v { font-family: var(--head); font-size: 28px; font-weight: 600; color: var(--navy); margin-top: 4px; line-height: 1.1; }
+  .tile .d { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+  .panel h2 { font-family: var(--head); font-size: 14.5px; font-weight: 600; margin: 0 0 2px; color: var(--navy); }
+  .panel .note { color: var(--muted); font-size: 12.5px; margin: 0 0 10px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); margin-bottom: 6px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .chart { position: relative; width: 100%; }
+  .chart svg { display: block; width: 100%; }
+  .chart text { font-family: var(--body); font-size: 11px; fill: var(--muted); }
+  .tip { position: absolute; pointer-events: none; background: #fff; border: 1px solid var(--line); box-shadow: 0 4px 16px rgba(0,23,64,.12); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; color: var(--ink); white-space: nowrap; z-index: 5; }
+  .tip b { display: block; margin-bottom: 4px; font-family: var(--head); font-size: 12px; }
+  .tip .row { display: flex; align-items: center; gap: 6px; }
+  .tip .row i { width: 8px; height: 8px; border-radius: 2px; }
+  .empty { color: var(--muted); padding: 24px 4px; text-align: center; }
+
+  .themes .bar-row { display: grid; grid-template-columns: minmax(120px, 44%) 1fr 38px; gap: 8px; align-items: center; padding: 4px 4px; border-radius: 6px; cursor: pointer; }
+  .themes .bar-row:hover, .themes .bar-row.on { background: #EEF3FB; }
+  .themes .lbl { font-size: 12.5px; color: var(--ink); }
+  .themes .track { height: 12px; position: relative; }
+  .themes .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gd); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .themes .num { font-size: 12.5px; color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+
+  .scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .score { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .score .k { font-size: 12px; color: var(--ink-2); }
+  .score .v { font-family: var(--head); font-size: 20px; color: var(--navy); font-weight: 600; }
+  .score .d { font-size: 12px; color: var(--muted); }
+  .score svg { display: block; width: 100%; height: 28px; margin-top: 4px; }
+
+  /* feed */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: -4px 0 12px; flex-wrap: wrap; }
+  .tabs button { border: 0; background: none; padding: 8px 12px; cursor: pointer; color: var(--ink-2); font-size: 13.5px; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabs button[aria-selected="true"] { color: var(--navy); border-bottom-color: var(--navy); font-weight: bold; }
+  .feed-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .feed-tools input[type=search] { flex: 1 1 220px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13.5px; }
+  .feed-tools select, .btn { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 13px; color: var(--ink); cursor: pointer; }
+  .btn.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink-2); }
+  .chip button { border: 0; background: none; cursor: pointer; padding: 0 2px; color: var(--muted); font-size: 14px; line-height: 1; }
+  .banner { background: #EEF3FB; border: 1px solid #D3DFF2; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 13px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; background: #fff; }
+  .card.is-new { border-left: 4px solid var(--cyan); }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 12.5px; color: var(--muted); }
+  .src { display: inline-flex; align-items: center; gap: 6px; font-weight: bold; color: var(--ink); }
+  .src i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .badge { padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: bold; }
+  .b-neg { background: var(--neg-bg); color: var(--neg); } .b-mix { background: var(--mix-bg); color: var(--mix); }
+  .b-pos { background: var(--pos-bg); color: var(--pos); } .b-neu { background: var(--neu-bg); color: var(--neu); }
+  .b-conf { background: #E6EDF8; color: var(--navy); } .b-poss { background: #fff; color: var(--ink-2); border: 1px dashed #B8C3D3; }
+  .b-new { background: var(--cyan); color: var(--navy); }
+  .card h3 { margin: 8px 0 4px; font-size: 15px; color: var(--ink); }
+  .stars { color: var(--navy); letter-spacing: 1px; font-size: 13px; }
+  .who { font-size: 13px; color: var(--ink-2); margin: 6px 0 2px; }
+  .who a { font-weight: bold; color: var(--ink); text-decoration: none; }
+  .body { font-size: 13.5px; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 6px; }
+  .body .sec { display: block; margin-top: 6px; }
+  .body .sec-k { font-weight: bold; color: var(--ink-2); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; display: block; }
+  .body.clamped { max-height: 9.6em; overflow: hidden; position: relative; }
+  .body.clamped::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2.4em; background: linear-gradient(rgba(255,255,255,0), #fff); }
+  mark { background: #FFE8A3; color: inherit; padding: 0 1px; border-radius: 2px; }
+  .reply { margin-top: 8px; padding: 8px 10px; background: var(--bg); border-radius: 8px; font-size: 12.5px; color: var(--ink-2); }
+  .foot { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .foot .sp { flex: 1; }
+  .link-btn { border: 0; background: none; color: var(--gd); cursor: pointer; padding: 0; font-size: 12.5px; text-decoration: underline; }
+  .more { display: block; margin: 12px auto 0; }
+  .reason { font-size: 12.5px; color: var(--ink-2); margin-top: 6px; }
+  .toast { position: fixed; right: 16px; bottom: 16px; background: var(--navy); color: #fff; padding: 10px 14px; border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.25); z-index: 20; }
+  footer.method { color: var(--ink-2); font-size: 12.5px; margin-top: 24px; border-top: 1px solid var(--line); padding-top: 14px; max-width: 110ch; }
+  footer.method h2 { font-family: var(--head); font-size: 13px; color: var(--navy); margin: 0 0 6px; }
+  footer.method p { margin: 0 0 8px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+<!--EMBED-->
+</head>
+<body>
+
+<div class="lock" id="lock" hidden>
+  <form id="lockForm" autocomplete="off">
+    <h1>Issue monitor</h1>
+    <p>Enter the passphrase to open the dashboard.</p>
+    <label class="sr" for="pw">Passphrase</label>
+    <input id="pw" type="password" autofocus>
+    <button type="submit">Open</button>
+    <div class="err" id="lockErr"></div>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="top-row">
+      <div>
+        <h1 id="title">Issue monitor</h1>
+        <div class="sub" id="subtitle">Glassdoor reviews and LinkedIn posts that mention redundancies, filtered to remove anything off-topic.</div>
+      </div>
+      <div class="refresh-note" id="refreshNote"></div>
+    </div>
+    <div class="status" id="status"></div>
+  </header>
+
+  <main>
+    <div class="controls" role="group" aria-label="Filters">
+      <div><span class="ctl-label">Period</span><span class="seg" id="periodSeg"></span></div>
+      <div><span class="ctl-label">Source</span><span class="seg" id="sourceSeg"></span></div>
+      <div><span class="ctl-label">Tone</span><span class="seg" id="toneSeg"></span></div>
+      <div><span class="ctl-label">Match</span><span class="seg" id="confSeg"></span></div>
+    </div>
+
+    <section class="tiles" id="tiles" aria-label="Headline numbers"></section>
+
+    <div class="grid2">
+      <section class="panel" id="trendPanel">
+        <h2 id="trendTitle">Redundancy mentions over time, by source</h2>
+        <p class="note" id="trendNote"></p>
+        <div class="legend" id="trendLegend"></div>
+        <div class="chart" id="trendChart"></div>
+      </section>
+      <section class="panel themes" id="themePanel">
+        <h2>What the mentions talk about</h2>
+        <p class="note">Share of mentions in this period that touch each theme. Click one to filter the feed.</p>
+        <div id="themeBars"></div>
+      </section>
+    </div>
+
+    <section class="panel" id="scorePanel" style="margin-bottom:16px">
+      <h2>Glassdoor scores, captured at every scrape</h2>
+      <p class="note" id="scoreNote"></p>
+      <div class="scores" id="scores"></div>
+    </section>
+
+    <section class="panel" id="feedPanel">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tabFeed" aria-selected="true">Mentions</button>
+        <button role="tab" id="tabAudit" aria-selected="false">Filtered out</button>
+      </div>
+      <div class="banner" id="overrideBanner" hidden></div>
+      <div class="feed-tools">
+        <input type="search" id="q" placeholder="Search the text, job titles, authors…" aria-label="Search">
+        <select id="sort" aria-label="Sort">
+          <option value="new">Newest first</option>
+          <option value="eng">Most engagement (LinkedIn)</option>
+          <option value="low">Lowest rating first (Glassdoor)</option>
+        </select>
+        <select id="typeSel" aria-label="LinkedIn post type"><option value="">All post types</option></select>
+        <button class="btn" id="markRead">Mark all as seen</button>
+        <button class="btn" id="csvBtn">Download CSV</button>
+      </div>
+      <div id="activeChips" class="feed-tools" style="margin-top:-4px"></div>
+      <div id="feed"></div>
+      <button class="btn more" id="moreBtn" hidden>Show more</button>
+    </section>
+
+    <footer class="method">
+      <h2>How the filter works</h2>
+      <p><b>Confirmed</b> means the text uses clear redundancy language (redundancies, layoffs, made redundant, job cuts, consultation period, severance and similar, in English, Spanish, Italian, Portuguese and French). <b>Possible</b> means only adjacent language, such as restructuring, reorgs or people being let go, so it's worth a human look. Phrases that only look like redundancy language, like "dismissive", "fired up" or "redundant meetings", are ignored.</p>
+      <p>LinkedIn posts also have to be about this company rather than another organisation with a similar name. A post counts if it mentions the company alongside payments language, a known person, or an author whose headline names the company. Posts about unrelated organisations are filtered out, and you can see them and the reason under <b>Filtered out</b>.</p>
+      <p><b>Tone</b> on Glassdoor is the reviewer's star rating (1–2 negative, 3 mixed, 4–5 positive). On LinkedIn it's a word-based read of the post, so treat it as a guide. If something's in the wrong place, use <b>Not relevant</b> or <b>Actually relevant</b> on the card, then share the change with everyone using the banner that appears.</p>
+    </footer>
+  </main>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const TZ = "Europe/London";
+  const COLORS = { glassdoor: "#2E62B8", linkedin: "#00A9CF" };
+  const SRC_NAME = { glassdoor: "Glassdoor", linkedin: "LinkedIn" };
+  const PAGE = 30;
+
+  // ---------- small helpers
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  };
+  const sget = (k) => { try { return sessionStorage.getItem(k); } catch (e) { return null; } };
+  const sset = (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) {} };
+  const el = (tag, attrs, ...kids) => {
+    const n = document.createElement(tag);
+    if (attrs) for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === "class") n.className = v; else if (k === "text") n.textContent = v;
+      else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+    }
+    for (const c of kids.flat()) if (c != null && c !== false) n.append(c.nodeType ? c : String(c));
+    return n;
+  };
+  const svgEl = (tag, attrs) => { const n = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+  const fmtN = (n) => (n ?? 0).toLocaleString("en-GB");
+  const fmtDate = (iso, withTime) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const o = { timeZone: TZ, day: "numeric", month: "short", year: "numeric" };
+    if (withTime) Object.assign(o, { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleString("en-GB", o);
+  };
+  const ago = (iso) => {
+    if (!iso) return "never";
+    const m = Math.round((Date.now() - new Date(iso)) / 60000);
+    if (m < 1) return "just now"; if (m < 60) return m + " min ago";
+    const h = Math.round(m / 60); if (h < 48) return h + (h === 1 ? " hour ago" : " hours ago");
+    return Math.round(h / 24) + " days ago";
+  };
+  const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  function highlight(text, terms) {
+    const frag = document.createDocumentFragment();
+    if (!text) return frag;
+    const t = (terms || []).filter(Boolean);
+    if (!t.length) { frag.append(text); return frag; }
+    const rx = new RegExp("(" + t.map(esc).join("|") + ")", "gi");
+    let last = 0, m;
+    while ((m = rx.exec(text))) {
+      if (m.index > last) frag.append(text.slice(last, m.index));
+      frag.append(el("mark", { text: m[0] }));
+      last = m.index + m[0].length;
+      if (m[0].length === 0) rx.lastIndex++;
+    }
+    if (last < text.length) frag.append(text.slice(last));
+    return frag;
+  }
+  function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 4000); }
+
+  // ---------- data loading
+  const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  async function decryptEnv(env, pw) {
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: b64(env.salt), iterations: env.iter, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(env.iv) }, key, b64(env.ct));
+    return JSON.parse(new TextDecoder().decode(pt));
+  }
+  let mode = null, passphrase = null;
+  async function fetchData() {
+    if (window.__DATA__) { mode = "embedded"; return window.__DATA__; }
+    const bust = "?t=" + Date.now();
+    if (mode !== "enc") {
+      const r = await fetch("data.json" + bust, { cache: "no-store" }).catch(() => null);
+      if (r && r.ok) { mode = "plain"; return r.json(); }
+    }
+    const r2 = await fetch("data.enc.json" + bust, { cache: "no-store" });
+    if (!r2.ok) throw new Error("No data published yet");
+    mode = "enc";
+    const env = await r2.json();
+    if (!passphrase) throw Object.assign(new Error("locked"), { env });
+    return decryptEnv(env, passphrase);
+  }
+
+  // ---------- state
+  let DATA = null;
+  const ui = {
+    period: store.get("mon.period", "30d"), source: "all", tone: "all", conf: "all",
+    theme: null, type: "", q: "", sort: "new", tab: "feed", shown: PAGE,
+  };
+  const prevVisit = store.get("mon.lastVisit", null);
+  let lastSeen = prevVisit;
+  store.set("mon.lastVisit", new Date().toISOString());
+  let local = store.get("mon.overrides", { include: [], exclude: [] });
+
+  const PERIODS = [
+    ["start", "Since monitoring began"], ["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"], ["12m", "12 months"], ["all", "All time"],
+  ];
+  function periodStart(p) {
+    const now = Date.now();
+    if (p === "24h") return new Date(now - 864e5);
+    if (p === "7d") return new Date(now - 7 * 864e5);
+    if (p === "30d") return new Date(now - 30 * 864e5);
+    if (p === "12m") return new Date(now - 365 * 864e5);
+    if (p === "start") return DATA.meta.monitoring_start ? new Date(DATA.meta.monitoring_start + "T00:00:00Z") : new Date(now - 864e5);
+    return null;
+  }
+  function periodLabel(p) {
+    if (p === "start") return DATA.meta.monitoring_start ? "since " + fmtDate(DATA.meta.monitoring_start) : "since monitoring began";
+    return { "24h": "in the last 24 hours", "7d": "in the last 7 days", "30d": "in the last 30 days", "12m": "in the last 12 months", all: "across all time" }[p];
+  }
+
+  // apply this browser's own include/exclude changes on top of the published data
+  function effective() {
+    const ex = new Set(local.exclude), inc = new Set(local.include);
+    const feed = [], audit = [];
+    for (const it of DATA.items) (ex.has(it.id) ? audit.push({ ...it, relevance: "excluded", reason: "Removed in this browser" }) : feed.push(it));
+    for (const it of DATA.audit) (inc.has(it.id) ? feed.push({ ...it, relevance: "confirmed", reason: "Added in this browser" }) : audit.push(it));
+    return { feed, audit };
+  }
+  function inPeriod(it) {
+    const s = periodStart(ui.period);
+    return !s || new Date(it.date || it.first_seen) >= s;
+  }
+  const isNew = (it) => !it.seed && lastSeen && it.first_seen > lastSeen;
+  function filtered(list, opts = {}) {
+    const q = ui.q.trim().toLowerCase();
+    return list.filter((it) => {
+      if (!inPeriod(it)) return false;
+      if (ui.source !== "all" && it.source !== ui.source) return false;
+      if (!opts.ignoreTone && ui.tone !== "all" && it.tone !== ui.tone) return false;
+      if (!opts.ignoreConf && ui.conf !== "all" && it.relevance !== ui.conf) return false;
+      if (!opts.ignoreTheme && ui.theme && !(it.themes || []).includes(ui.theme)) return false;
+      if (!opts.ignoreType && ui.type && it.type !== ui.type) return false;
+      if (q) {
+        const hay = [it.title, it.text, ...(Object.values(it.sections || {})), it.job_title, it.location, it.author && it.author.name, it.author && it.author.headline].join(" ").toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  // ---------- controls
+  function seg(id, options, key, after) {
+    const box = $(id); box.textContent = "";
+    for (const [v, label] of options) {
+      box.append(el("button", { type: "button", "aria-pressed": String(ui[key] === v), text: label, onclick: () => {
+        ui[key] = v; ui.shown = PAGE; if (key === "period") store.set("mon.period", v); after ? after() : render();
+      } }));
+    }
+  }
+  function renderControls() {
+    seg("periodSeg", PERIODS, "period");
+    const hasLi = DATA.items.some((i) => i.source === "linkedin") || ((DATA.meta.sources || {}).linkedin || {}).last_run_finished;
+    seg("sourceSeg", [["all", "Both"], ["glassdoor", "Glassdoor"], ["linkedin", "LinkedIn" + (hasLi ? "" : " (not connected)")]], "source");
+    seg("toneSeg", [["all", "All"], ["Negative", "Negative"], ["Mixed", "Mixed"], ["Positive", "Positive"], ["Neutral", "Neutral"]], "tone");
+    seg("confSeg", [["all", "Confirmed + possible"], ["confirmed", "Confirmed only"], ["possible", "Possible only"]], "conf");
+  }
+
+  // ---------- header
+  function renderHeader() {
+    const m = DATA.meta;
+    $("title").textContent = m.title || "Issue monitor";
+    document.title = m.title || "Issue monitor";
+    const st = $("status"); st.textContent = "";
+    for (const src of ["glassdoor", "linkedin"]) {
+      const s = (m.sources || {})[src];
+      if (!s || !s.last_run_finished) {
+        st.append(el("span", { class: "pill" }, el("i", { class: "dot", style: "background:#8FA2C0" }), `${SRC_NAME[src]}: not connected yet`));
+        continue;
+      }
+      const stale = !m.preview && Date.now() - new Date(s.last_run_finished) > 90 * 60000;
+      const warn = stale || s.last_error;
+      const txt = `${SRC_NAME[src]}: latest scrape ${fmtDate(s.last_run_finished, true)}` + (m.preview ? "" : ` (${ago(s.last_run_finished)})`) + (s.last_error ? " · last fetch failed" : stale ? " · overdue" : "");
+      st.append(el("span", { class: "pill" + (warn ? " warn" : "") }, el("i", { class: "dot", style: "background:" + COLORS[src] }), txt));
+    }
+    $("refreshNote").textContent = (mode === "embedded" || m.preview) ? `Preview: a fixed copy of the data from ${fmtDate(m.generated_at, true)}` : `Data built ${fmtDate(m.generated_at, true)} · this page checks for updates every 5 minutes`;
+  }
+
+  // ---------- tiles
+  function tile(k, v, d) { return el("div", { class: "tile" }, el("div", { class: "k", text: k }), el("div", { class: "v", text: v }), d ? el("div", { class: "d", text: d }) : null); }
+  function renderTiles(list) {
+    const t = $("tiles"); t.textContent = "";
+    const conf = list.filter((i) => i.relevance === "confirmed");
+    const poss = list.filter((i) => i.relevance === "possible");
+    const neg = list.filter((i) => i.tone === "Negative");
+    const nNew = list.filter(isNew).length;
+    t.append(tile("Redundancy mentions " + periodLabel(ui.period), fmtN(conf.length), poss.length ? `plus ${fmtN(poss.length)} possible` : "no borderline items"));
+    t.append(tile("Negative in tone", fmtN(neg.length), list.length ? `${Math.round((neg.length / list.length) * 100)}% of what's shown` : "nothing in this period"));
+    t.append(tile("New since your last visit", fmtN(nNew), lastSeen ? "last visit " + ago(lastSeen) : "first visit on this browser"));
+    const li = list.filter((i) => i.source === "linkedin");
+    const eng = li.reduce((a, i) => a + (i.engagement ? i.engagement.reactions + i.engagement.comments + i.engagement.reposts : 0), 0);
+    t.append(tile("LinkedIn engagement on these posts", li.length ? fmtN(eng) : "–", li.length ? `reactions, comments and reposts across ${fmtN(li.length)} posts` : "no LinkedIn posts in view"));
+    const snaps = DATA.snapshots || [];
+    if (snaps.length) {
+      const last = snaps[snaps.length - 1], first = snaps[0];
+      const diff = +(last.overall - first.overall).toFixed(2);
+      t.append(tile("Glassdoor overall rating", last.overall.toFixed(1) + " / 5", snaps.length > 1 ? `${diff === 0 ? "no change" : (diff > 0 ? "up " : "down ") + Math.abs(diff).toFixed(1)} since ${fmtDate(first.at)}` : "tracking from " + fmtDate(first.at)));
+    }
+  }
+
+  // ---------- trend chart
+  function bucketKey(d, g) {
+    const p = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d); // YYYY-MM-DD
+    if (g === "day") return p;
+    if (g === "month") return p.slice(0, 7);
+    const dt = new Date(p + "T00:00:00Z"); const wd = (dt.getUTCDay() + 6) % 7; dt.setUTCDate(dt.getUTCDate() - wd);
+    return dt.toISOString().slice(0, 10);
+  }
+  function bucketLabel(k, g, short) {
+    if (g === "month") { const d = new Date(k + "-01T00:00:00Z"); return d.toLocaleString("en-GB", { month: "short", year: short ? "2-digit" : "numeric", timeZone: "UTC" }); }
+    const d = new Date(k + "T00:00:00Z"); const s = d.toLocaleString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+    return g === "week" ? (short ? s : "Week of " + s) : s;
+  }
+  function nextKey(k, g) {
+    if (g === "month") { const d = new Date(k + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + 1); return d.toISOString().slice(0, 7); }
+    const d = new Date(k + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + (g === "week" ? 7 : 1)); return d.toISOString().slice(0, 10);
+  }
+  function renderTrend(list) {
+    const box = $("trendChart"); box.textContent = "";
+    const start = periodStart(ui.period);
+    const dates = list.map((i) => new Date(i.date || i.first_seen));
+    const from = start || (dates.length ? new Date(Math.min(...dates)) : new Date());
+    const spanDays = (Date.now() - from) / 864e5;
+    const g = spanDays <= 45 ? "day" : spanDays <= 400 ? "week" : "month";
+    $("trendTitle").textContent = `Redundancy mentions per ${g}, by source`;
+    const keys = []; let k = bucketKey(from, g); const endK = bucketKey(new Date(), g);
+    while (k <= endK && keys.length < 400) { keys.push(k); k = nextKey(k, g); }
+    const rows = new Map(keys.map((x) => [x, { glassdoor: 0, linkedin: 0, neg: 0, gdTotal: 0 }]));
+    for (const it of list) { const r = rows.get(bucketKey(new Date(it.date || it.first_seen), g)); if (r) { r[it.source]++; if (it.tone === "Negative") r.neg++; } }
+    const vol = (DATA.volume || {}).glassdoor || {};
+    for (const [day, n] of Object.entries(vol)) { const r = rows.get(bucketKey(new Date(day + "T12:00:00Z"), g)); if (r) r.gdTotal += n; }
+    const srcs = ui.source === "all" ? ["glassdoor", "linkedin"] : [ui.source];
+    const lg = $("trendLegend"); lg.textContent = "";
+    for (const s of srcs) lg.append(el("span", null, el("i", { style: "background:" + COLORS[s] }), SRC_NAME[s]));
+    $("trendNote").textContent = `${list.length ? fmtN(list.length) + " mentions" : "No mentions"} ${periodLabel(ui.period)}, matching the filters above. Hover a column for detail.`;
+
+    const W = Math.max(280, box.clientWidth || 600), H = 220, m = { t: 10, r: 8, b: 26, l: 30 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const max = Math.max(1, ...[...rows.values()].map((r) => srcs.reduce((a, s) => a + r[s], 0)));
+    const nice = max <= 5 ? max : Math.ceil(max / 5) * 5;
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": $("trendTitle").textContent });
+    const ticks = nice <= 5 ? [...Array(nice + 1).keys()] : [0, nice / 5, (2 * nice) / 5, (3 * nice) / 5, (4 * nice) / 5, nice];
+    for (const tv of ticks) {
+      const y = m.t + ih - (tv / nice) * ih;
+      svg.append(svgEl("line", { x1: m.l, x2: W - m.r, y1: y, y2: y, stroke: tv === 0 ? "#C9D1DD" : "#EDF0F4", "stroke-width": 1 }));
+      const tx = svgEl("text", { x: m.l - 6, y: y + 3.5, "text-anchor": "end" }); tx.textContent = fmtN(tv); svg.append(tx);
+    }
+    const band = iw / keys.length, bw = Math.max(1, Math.min(24, band * 0.7));
+    const every = Math.ceil(keys.length / Math.max(2, Math.floor(iw / 64)));
+    const tip = el("div", { class: "tip", hidden: true });
+    keys.forEach((key, i) => {
+      const r = rows.get(key); const x = m.l + i * band + (band - bw) / 2;
+      let y = m.t + ih; const total = srcs.reduce((a, s) => a + r[s], 0);
+      srcs.forEach((s, si) => {
+        if (!r[s]) return;
+        const h = (r[s] / nice) * ih; const top = si === srcs.length - 1 || !srcs.slice(si + 1).some((t) => r[t]);
+        const gap = y < m.t + ih ? 2 : 0; const hh = Math.max(1, h - gap);
+        const rad = top ? Math.min(4, bw / 2, hh) : 0;
+        const y0 = y - gap - hh;
+        const d = `M${x},${y - gap} V${y0 + rad} Q${x},${y0} ${x + rad},${y0} H${x + bw - rad} Q${x + bw},${y0} ${x + bw},${y0 + rad} V${y - gap} Z`;
+        svg.append(svgEl("path", { d, fill: COLORS[s] }));
+        y = y0;
+      });
+      if (i % every === 0) { const tx = svgEl("text", { x: m.l + i * band + band / 2, y: H - 8, "text-anchor": "middle" }); tx.textContent = bucketLabel(key, g, true); svg.append(tx); }
+      const hit = svgEl("rect", { x: m.l + i * band, y: m.t, width: band, height: ih, fill: "transparent" });
+      hit.addEventListener("mousemove", (ev) => {
+        tip.textContent = "";
+        tip.append(el("b", { text: bucketLabel(key, g, false) }));
+        for (const s of srcs) tip.append(el("div", { class: "row" }, el("i", { style: "background:" + COLORS[s] }), `${SRC_NAME[s]}: ${r[s]}` + (s === "glassdoor" && r.gdTotal ? ` of ${r.gdTotal} reviews` : "")));
+        tip.append(el("div", { class: "row", text: `Negative in tone: ${r.neg}` }));
+        tip.hidden = false;
+        const bx = box.getBoundingClientRect(); let lx = ev.clientX - bx.left + 12; const tw = tip.offsetWidth;
+        if (lx + tw > bx.width) lx = ev.clientX - bx.left - tw - 12;
+        tip.style.left = Math.max(0, lx) + "px"; tip.style.top = Math.max(0, ev.clientY - bx.top - 30) + "px";
+      });
+      hit.addEventListener("mouseleave", () => (tip.hidden = true));
+      svg.append(hit);
+    });
+    box.append(svg, tip);
+  }
+
+  // ---------- themes
+  function renderThemes(list) {
+    const box = $("themeBars"); box.textContent = "";
+    if (!list.length) { box.append(el("div", { class: "empty", text: "Nothing in this period yet." })); return; }
+    const counts = {};
+    for (const it of list) for (const t of it.themes || []) counts[t] = (counts[t] || 0) + 1;
+    const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    if (!rows.length) { box.append(el("div", { class: "empty", text: "No recurring themes in these mentions." })); return; }
+    for (const [name, n] of rows) {
+      const pct = Math.round((n / list.length) * 100);
+      box.append(el("div", { class: "bar-row" + (ui.theme === name ? " on" : ""), role: "button", tabindex: "0", title: `${n} of ${list.length} mentions`,
+        onclick: () => { ui.theme = ui.theme === name ? null : name; ui.shown = PAGE; render(); },
+        onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } } },
+        el("span", { class: "lbl", text: name }),
+        el("span", { class: "track" }, el("span", { class: "fill", style: `width:${pct}%` })),
+        el("span", { class: "num", text: pct + "%" })));
+    }
+  }
+
+  // ---------- Glassdoor scores
+  function spark(vals) {
+    const s = svgEl("svg", { viewBox: "0 0 100 28", preserveAspectRatio: "none" });
+    if (vals.length < 2) return s;
+    const mn = Math.min(...vals), mx = Math.max(...vals), r = mx - mn || 1;
+    const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * 96 + 2},${24 - ((v - mn) / r) * 20 + 2}`);
+    s.append(svgEl("polyline", { points: pts.join(" "), fill: "none", stroke: "#2E62B8", "stroke-width": 2, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    return s;
+  }
+  function renderScores() {
+    const snaps = DATA.snapshots || [], box = $("scores"); box.textContent = "";
+    if (!snaps.length) { $("scorePanel").hidden = true; return; }
+    $("scorePanel").hidden = false;
+    const first = snaps[0], last = snaps[snaps.length - 1];
+    $("scoreNote").textContent = snaps.length > 1
+      ? `Tracked across ${snaps.length} snapshots since ${fmtDate(first.at, true)}. Changes are against the first snapshot.`
+      : `First snapshot taken ${fmtDate(first.at, true)}. Changes will show here as new scrapes come in.`;
+    const defs = [
+      ["Overall rating", "overall", (v) => v.toFixed(1) + " / 5", 1],
+      ["Would recommend to a friend", "recommend", (v) => Math.round(v * 100) + "%", 100],
+      ["CEO approval", "ceo", (v) => Math.round(v * 100) + "%", 100],
+      ["Senior management", "senior_mgmt", (v) => v.toFixed(1) + " / 5", 1],
+      ["Total reviews", "reviews", (v) => fmtN(v), 1],
+      ["One-star reviews", "one_star", (v) => fmtN(v), 1],
+    ];
+    for (const [label, key, f, mult] of defs) {
+      if (last[key] == null) continue;
+      const vals = snaps.map((s) => s[key]).filter((v) => v != null);
+      const diff = (last[key] - first[key]) * mult;
+      const dtxt = snaps.length < 2 ? "" : Math.abs(diff) < 0.05 ? "no change" : (diff > 0 ? "+" : "−") + (key === "reviews" || key === "one_star" ? fmtN(Math.abs(diff)) : mult === 100 ? Math.abs(Math.round(diff)) + " pts" : Math.abs(diff).toFixed(1));
+      box.append(el("div", { class: "score" }, el("div", { class: "k", text: label }), el("div", { class: "v", text: f(last[key]) }), el("div", { class: "d", text: dtxt || " " }), spark(vals)));
+    }
+  }
+
+  // ---------- feed
+  function toneBadge(t) { const c = { Negative: "b-neg", Mixed: "b-mix", Positive: "b-pos" }[t] || "b-neu"; return el("span", { class: "badge " + c, text: t || "Unrated" }); }
+  function card(it, auditView) {
+    const c = el("article", { class: "card" + (isNew(it) ? " is-new" : "") });
+    const meta = el("div", { class: "meta-row" },
+      el("span", { class: "src" }, el("i", { style: "background:" + COLORS[it.source] }), SRC_NAME[it.source]),
+      el("span", { text: fmtDate(it.date, it.source === "linkedin") }),
+      isNew(it) ? el("span", { class: "badge b-new", text: "New" }) : null,
+      auditView ? el("span", { class: "badge b-neu", text: "Filtered out" }) : el("span", { class: "badge " + (it.relevance === "confirmed" ? "b-conf" : "b-poss"), text: it.relevance === "confirmed" ? "Confirmed" : "Possible" }),
+      toneBadge(it.tone),
+      it.type ? el("span", { class: "chip", text: it.type }) : null);
+    c.append(meta);
+    const terms = it.hl || [];
+    let body;
+    if (it.source === "glassdoor") {
+      const r = it.rating || 0;
+      c.append(el("h3", null, el("span", { class: "stars", "aria-label": r + " out of 5 stars", text: "★".repeat(r) + "☆".repeat(5 - r) }), " ", highlight(it.title || "", terms)));
+      c.append(el("div", { class: "who", text: [it.job_title, it.location, it.current === true ? "Current employee" : it.current === false ? "Former employee" : null].filter(Boolean).join(" · ") }));
+      body = el("div", { class: "body" });
+      for (const [k, v] of Object.entries(it.sections || {})) {
+        body.append(el("span", { class: "sec" }, el("span", { class: "sec-k", text: { pros: "Pros", cons: "Cons", advice: "Advice to management" }[k] || k }), highlight(v, terms)));
+      }
+    } else {
+      const a = it.author || {};
+      c.append(el("div", { class: "who" }, a.url ? el("a", { href: a.url, target: "_blank", rel: "noopener", text: a.name || "LinkedIn member" }) : el("b", { text: a.name || "LinkedIn member" }), a.headline ? " · " + a.headline : ""));
+      if (it.kind === "comment") c.append(el("div", { class: "reply" }, el("b", { text: `Comment on ${it.parent_author || "a"}'s post: ` }), (it.parent_snippet || "").slice(0, 200) + "…"));
+      body = el("div", { class: "body" }, highlight(it.text || "", terms));
+    }
+    c.append(body);
+    const long = (body.textContent || "").length > 600;
+    let toggle = null;
+    if (long) {
+      body.classList.add("clamped");
+      toggle = el("button", { class: "link-btn", text: "Show all", onclick: () => { const on = body.classList.toggle("clamped"); toggle.textContent = on ? "Show all" : "Show less"; } });
+    }
+    if (it.employer_response) c.append(el("div", { class: "reply" }, el("b", { text: "Employer replied" + (it.employer_response_date ? " " + fmtDate(it.employer_response_date) : "") + ": " }), it.employer_response));
+    if (auditView) c.append(el("div", { class: "reason" }, el("b", { text: "Why it was filtered out: " }), it.reason));
+    const eng = it.engagement ? `${fmtN(it.engagement.reactions)} reactions · ${fmtN(it.engagement.comments)} comments · ${fmtN(it.engagement.reposts)} reposts` : null;
+    const isLocal = local.include.includes(it.id) || local.exclude.includes(it.id);
+    c.append(el("div", { class: "foot" },
+      toggle,
+      eng ? el("span", { text: eng }) : null,
+      it.matched && it.matched.length ? el("span", { text: "Matched: " + it.matched.join(", ") }) : null,
+      it.themes && it.themes.length && !auditView ? el("span", { text: "Themes: " + it.themes.join(", ") }) : null,
+      el("span", { class: "sp" }),
+      it.url ? el("a", { href: it.url, target: "_blank", rel: "noopener", text: "Open on " + SRC_NAME[it.source] + " ↗" }) : null,
+      isLocal ? el("button", { class: "link-btn", text: "Undo", onclick: () => setLocal(it.id, null) })
+        : auditView ? el("button", { class: "link-btn", text: "Actually relevant", onclick: () => setLocal(it.id, "include") })
+        : el("button", { class: "link-btn", text: "Not relevant", onclick: () => setLocal(it.id, "exclude") })));
+    return c;
+  }
+  function setLocal(id, action) {
+    local.include = local.include.filter((x) => x !== id); local.exclude = local.exclude.filter((x) => x !== id);
+    if (action) local[action].push(id);
+    store.set("mon.overrides", local); render();
+  }
+  function renderBanner() {
+    const b = $("overrideBanner"); const n = local.include.length + local.exclude.length;
+    b.hidden = !n; b.textContent = "";
+    if (!n) return;
+    const shared = DATA.meta.overrides || { include: [], exclude: [] };
+    const merged = { include: [...new Set([...shared.include, ...local.include])], exclude: [...new Set([...shared.exclude, ...local.exclude])] };
+    for (const id of merged.include) merged.exclude = merged.exclude.filter((x) => x !== id && x !== id.split(":")[1]);
+    const json = JSON.stringify(merged);
+    b.append(el("span", { text: `You've corrected ${n} item${n === 1 ? "" : "s"} in this browser only. To apply ${n === 1 ? "it" : "them"} for everyone, copy the settings and paste them into the MONITOR_OVERRIDES variable in GitHub.` }),
+      el("button", { class: "btn primary", text: "Copy settings", onclick: async () => {
+        try { await navigator.clipboard.writeText(json); toast("Copied. Paste it into MONITOR_OVERRIDES in GitHub."); }
+        catch (e) { const ta = el("textarea", { style: "width:100%;height:60px" }); ta.value = json; b.append(ta); ta.select(); }
+      } }),
+      el("button", { class: "btn", text: "Clear my changes", onclick: () => { local = { include: [], exclude: [] }; store.set("mon.overrides", local); render(); } }));
+  }
+  function renderChips() {
+    const box = $("activeChips"); box.textContent = "";
+    if (ui.theme) box.append(el("span", { class: "chip" }, "Theme: " + ui.theme, el("button", { "aria-label": "Clear theme", text: "×", onclick: () => { ui.theme = null; render(); } })));
+    box.hidden = !box.childNodes.length;
+  }
+  function renderFeed(eff) {
+    const feedList = filtered(eff.feed);
+    const auditList = filtered(eff.audit, { ignoreTone: true, ignoreConf: true, ignoreTheme: true });
+    $("tabFeed").textContent = `Mentions (${fmtN(feedList.length)})`;
+    $("tabAudit").textContent = `Filtered out (${fmtN(auditList.length)})`;
+    $("tabFeed").setAttribute("aria-selected", String(ui.tab === "feed"));
+    $("tabAudit").setAttribute("aria-selected", String(ui.tab === "audit"));
+    // post-type options
+    const types = [...new Set(eff.feed.filter((i) => i.type).map((i) => i.type))].sort();
+    const sel = $("typeSel"); const cur = ui.type; sel.textContent = ""; sel.append(el("option", { value: "", text: "All post types" }));
+    for (const t of types) sel.append(el("option", { value: t, text: t }));
+    sel.value = cur; sel.hidden = !types.length;
+    let list = ui.tab === "feed" ? feedList : auditList;
+    list = list.slice();
+    const eng = (i) => (i.engagement ? i.engagement.reactions + 2 * i.engagement.comments + 3 * i.engagement.reposts : -1);
+    if (ui.sort === "eng") list.sort((a, b) => eng(b) - eng(a) || (b.date > a.date ? 1 : -1));
+    else if (ui.sort === "low") list.sort((a, b) => (a.rating ?? 9) - (b.rating ?? 9) || (b.date > a.date ? 1 : -1));
+    else list.sort((a, b) => ((b.date || "") > (a.date || "") ? 1 : -1));
+    const box = $("feed"); box.textContent = "";
+    if (ui.tab === "audit") {
+      const parts = [];
+      for (const src of ["glassdoor", "linkedin"]) {
+        const w = ((DATA.meta.counts || {})[src] || {}).why;
+        if (!w) continue;
+        const tot = Object.values(w).reduce((a, b) => a + b, 0);
+        parts.push(`${SRC_NAME[src]}: ${fmtN(tot)} items filtered out in total (` + Object.entries(w).map(([k, v]) => `${fmtN(v)} ${k.toLowerCase()}`).join(", ") + ")");
+      }
+      box.append(el("p", { class: "note", style: "margin:0 0 12px", text: parts.join(". ") + ". Shown below are only the ones that used redundancy-like language, so you can check the filter's calls." }));
+    }
+    if (!list.length) box.append(el("div", { class: "empty", text: ui.tab === "feed" ? `No mentions ${periodLabel(ui.period)} with these filters. Try a longer period.` : "Nothing was filtered out in this period." }));
+    for (const it of list.slice(0, ui.shown)) box.append(card(it, ui.tab === "audit"));
+    $("moreBtn").hidden = list.length <= ui.shown;
+    $("moreBtn").textContent = `Show more (${fmtN(list.length - ui.shown)} left)`;
+    window.__current = list;
+  }
+
+  function csv() {
+    const list = window.__current || [];
+    const cols = ["source", "date", "relevance", "tone", "rating", "type", "title", "text", "author", "headline", "job_title", "location", "reactions", "comments", "reposts", "matched", "themes", "reason", "url"];
+    const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = list.map((i) => [i.source, i.date, i.relevance, i.tone, i.rating, i.type, i.title,
+      i.text || Object.entries(i.sections || {}).map(([k, v]) => k.toUpperCase() + ": " + v).join("\n"),
+      i.author && i.author.name, i.author && i.author.headline, i.job_title, i.location,
+      i.engagement && i.engagement.reactions, i.engagement && i.engagement.comments, i.engagement && i.engagement.reposts,
+      (i.matched || []).join("; "), (i.themes || []).join("; "), i.reason, i.url].map(q).join(","));
+    const blob = new Blob(["﻿" + [cols.join(","), ...rows].join("\r\n")], { type: "text/csv" });
+    const a = el("a", { href: URL.createObjectURL(blob), download: "mentions-" + new Date().toISOString().slice(0, 10) + ".csv" });
+    document.body.append(a); a.click(); a.remove();
+  }
+
+  // ---------- render all
+  function render() {
+    const eff = effective();
+    const scoped = filtered(eff.feed, { ignoreTheme: true, ignoreType: true });
+    renderControls(); renderHeader(); renderTiles(scoped); renderTrend(scoped); renderThemes(scoped); renderScores();
+    renderBanner(); renderChips(); renderFeed(eff);
+  }
+
+  // ---------- wiring
+  function wire() {
+    $("q").addEventListener("input", (e) => { ui.q = e.target.value; ui.shown = PAGE; renderFeed(effective()); });
+    $("sort").addEventListener("change", (e) => { ui.sort = e.target.value; renderFeed(effective()); });
+    $("typeSel").addEventListener("change", (e) => { ui.type = e.target.value; ui.shown = PAGE; renderFeed(effective()); });
+    $("tabFeed").addEventListener("click", () => { ui.tab = "feed"; ui.shown = PAGE; renderFeed(effective()); });
+    $("tabAudit").addEventListener("click", () => { ui.tab = "audit"; ui.shown = PAGE; renderFeed(effective()); });
+    $("moreBtn").addEventListener("click", () => { ui.shown += PAGE; renderFeed(effective()); });
+    $("markRead").addEventListener("click", () => { lastSeen = new Date().toISOString(); store.set("mon.lastVisit", lastSeen); render(); });
+    $("csvBtn").addEventListener("click", csv);
+    let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { const eff = effective(); renderTrend(filtered(eff.feed, { ignoreTheme: true, ignoreType: true })); }, 150); });
+  }
+
+  async function poll() {
+    if (mode === "embedded" || (DATA.meta && DATA.meta.preview)) return;
+    try {
+      const before = new Set(DATA.items.map((i) => i.id));
+      const d = await fetchData();
+      if (d.meta.generated_at !== DATA.meta.generated_at) {
+        const fresh = d.items.filter((i) => !before.has(i.id)).length;
+        DATA = d; render();
+        if (fresh) { toast(`${fresh} new mention${fresh === 1 ? "" : "s"}`); document.title = `(${fresh}) ` + (d.meta.title || "Issue monitor"); }
+      } else renderHeader();
+    } catch (e) { /* keep showing what we have */ }
+  }
+
+  function start(d) {
+    DATA = d; $("lock").hidden = true; $("app").hidden = false;
+    wire(); render();
+    setInterval(poll, 5 * 60000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) { poll(); document.title = DATA.meta.title || "Issue monitor"; } });
+  }
+
+  async function boot() {
+    passphrase = sget("mon.pw");
+    try { start(await fetchData()); }
+    catch (e) {
+      if (mode === "enc") {
+        $("lock").hidden = false;
+        if (passphrase) $("lockErr").textContent = "That passphrase didn't work.";
+        $("lockForm").addEventListener("submit", async (ev) => {
+          ev.preventDefault(); $("lockErr").textContent = "Opening…";
+          passphrase = $("pw").value;
+          try { const d = await fetchData(); sset("mon.pw", passphrase); start(d); }
+          catch (err) { $("lockErr").textContent = "That passphrase didn't work."; }
+        });
+      } else {
+        document.body.append(el("p", { style: "padding:24px", text: "No data has been published yet. Run the workflow once from the Actions tab." }));
+      }
+    }
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
