@@ -391,6 +391,12 @@ ALLOWED_PREV = {"At", "With", "From", "By", "And", "For", "Join", "Joined", "Joi
                 "Congratulations", "Congrats", "Welcome", "Via", "Thanks", "Thank", "Did", "Does", "Is", "Has", "Have", "Hearing"}
 
 
+# Capitalised words that can open a sentence about the company itself ("Today Acme said...")
+SENTENCE_START = {"The", "Our", "Your", "My", "How", "When", "If", "Introducing", "New", "Today", "Yesterday", "This", "Last", "Now", "So", "But", "Here", "Breaking", "News", "Update", "Exclusive",
+                  "Reportedly", "Fintech", "Payments", "Payment", "Unicorn", "London", "British", "Startup", "Scaleup", "Sadly",
+                  "Unfortunately", "Apparently", "Interesting", "Big", "More", "Another", "Former", "Ex-colleagues", "Colleagues"}
+
+
 def clean_mentions(text, cc):
     """Positions where the brand is used as the company's name, not as part of
     another name ('Market Acme', 'Acme Films', 'ACME™') or an everyday word ('my acme')."""
@@ -407,9 +413,11 @@ def clean_mentions(text, cc):
         before = text[max(0, mt.start() - 60):mt.start()]
         pm = re.search(r"([A-Za-z][\w&'-]*)[ \t]+$", before)
         if pm and pm.group(1)[0].isupper() and pm.group(1) not in ALLOWED_PREV:
+            word = pm.group(1)
             pre = before[:pm.start()].rstrip(" \t")
-            if pre and pre[-1] not in ".!?\n:•-\"'(“‘|#*":
-                continue  # a capitalised word mid-sentence: part of another name
+            at_start = not pre or pre[-1] in ".!?\n:•-\"'(“‘|#*⠀"
+            if not at_start or word.isupper() or word not in SENTENCE_START:
+                continue  # 'Market Acme', 'CS Acme': a capitalised word in front makes it another name
         out.append(mt.start())
     return out
 
@@ -474,7 +482,7 @@ def classify(rec, cc, cfg, overrides, parent=None):
         if rec.get("kind") == "comment":
             # a comment inherits whether its post is about the company
             pc = classify(parent, cc, cfg, {"include": set(), "exclude": set()}) if parent else {"entity": "none"}
-            mentions = pc["entity"] in ("confirmed", "ambiguous") or bool(mpos)
+            mentions = pc["entity"] == "confirmed" or bool(mpos)
             ctx = pc["entity"] == "confirmed"
             near = ctx
             excl = None if mentions else True
