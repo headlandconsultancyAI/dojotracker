@@ -1,0 +1,72 @@
+name: Refresh monitor
+
+on:
+  repository_dispatch:           # Apify calls this when each scrape finishes
+    types: [apify-run]
+  schedule:
+    - cron: "12,42 * * * *"      # backup, in case a webhook call goes missing
+  workflow_dispatch:             # run it by hand from the Actions tab
+    inputs:
+      glassdoor_dataset:
+        description: "Optional: pull this Apify dataset ID for Glassdoor instead of the latest run"
+        required: false
+      linkedin_dataset:
+        description: "Optional: pull this Apify dataset ID for LinkedIn instead of the latest run"
+        required: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Both scrapes finish around the same time, so runs queue rather than collide
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install --quiet cryptography
+
+      - name: Pull from Apify and rebuild
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+          DASHBOARD_PASSWORD_PREVIOUS: ${{ secrets.DASHBOARD_PASSWORD_PREVIOUS }}
+          APIFY_GLASSDOOR_TASK_ID: ${{ vars.APIFY_GLASSDOOR_TASK_ID }}
+          APIFY_LINKEDIN_TASK_ID: ${{ vars.APIFY_LINKEDIN_TASK_ID }}
+          MONITOR_CONFIG: ${{ vars.MONITOR_CONFIG }}
+          MONITOR_OVERRIDES: ${{ vars.MONITOR_OVERRIDES }}
+          GLASSDOOR_DATASET_ID: ${{ github.event.inputs.glassdoor_dataset }}
+          LINKEDIN_DATASET_ID: ${{ github.event.inputs.linkedin_dataset }}
+        run: python monitor.py
+
+      - name: Save the archive
+        run: |
+          git config user.name "monitor-bot"
+          git config user.email "monitor-bot@users.noreply.github.com"
+          git add -A data
+          if ! git diff --staged --quiet; then
+            git commit -m "Update data $(date -u +%Y-%m-%dT%H:%MZ)"
+            git pull --rebase
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: out
+      - id: deploy
+        uses: actions/deploy-pages@v4
