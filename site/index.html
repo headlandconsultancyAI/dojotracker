@@ -396,12 +396,12 @@
         st.append(el("span", { class: "pill" }, el("i", { class: "dot", style: "background:#8FA2C0" }), `${SRC_NAME[src]}: not connected yet`));
         continue;
       }
-      const stale = !m.preview && Date.now() - new Date(s.last_run_finished) > 90 * 60000;
+      const stale = !m.preview && Date.now() - new Date(s.last_run_finished) > 26 * 60 * 60000;
       const warn = stale || s.last_error;
       const txt = `${SRC_NAME[src]}: latest scrape ${fmtDate(s.last_run_finished, true)}` + (m.preview ? "" : ` (${ago(s.last_run_finished)})`) + (s.last_error ? " · last fetch failed" : stale ? " · overdue" : "");
       st.append(el("span", { class: "pill" + (warn ? " warn" : "") }, el("i", { class: "dot", style: "background:" + COLORS[src] }), txt));
     }
-    $("refreshNote").textContent = (mode === "embedded" || m.preview) ? `Preview: a fixed copy of the data from ${fmtDate(m.generated_at, true)}` : `Data built ${fmtDate(m.generated_at, true)} · this page checks for updates every 5 minutes`;
+    $("refreshNote").textContent = (mode === "embedded" || m.preview) ? `Preview: a fixed copy of the data from ${fmtDate(m.generated_at, true)}` : `Data built ${fmtDate(m.generated_at, true)} · new data arrives daily around 7am`;
   }
 
   // ---------- tiles
