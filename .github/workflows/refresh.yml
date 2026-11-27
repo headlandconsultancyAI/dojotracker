@@ -4,7 +4,7 @@ on:
   repository_dispatch:           # Apify calls this when each scrape finishes
     types: [apify-run]
   schedule:
-    - cron: "12,42 * * * *"      # backup, in case a webhook call goes missing
+    - cron: "45 7 * * *"      # daily backup, in case the webhook call goes missing
   workflow_dispatch:             # run it by hand from the Actions tab
     inputs:
       glassdoor_dataset:
